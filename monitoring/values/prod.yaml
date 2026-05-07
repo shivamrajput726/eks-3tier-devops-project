@@ -1,0 +1,27 @@
+grafana:
+  adminPassword: ProdGrafanaPass-2026-Strong
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.eks-3tier.internal
+    path: /
+    pathType: Prefix
+  defaultDashboardsTimezone: browser
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+    ruleNamespaceSelector: {}
+alertmanager:
+  alertmanagerSpec:
+    replicas: 2

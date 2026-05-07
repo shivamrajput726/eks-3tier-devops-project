@@ -1,0 +1,58 @@
+name: Promote Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Previously built image tag to promote to prod"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    name: Promote Dev Image to Prod
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+      ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Update prod overlay image tags
+        run: |
+          node scripts/update-kustomization-images.mjs \
+            --file "k8s/overlays/prod/kustomization.yaml" \
+            --frontend-repo "docker.io/${DOCKERHUB_NAMESPACE}/eks-3tier-frontend" \
+            --frontend-tag "${IMAGE_TAG}" \
+            --backend-repo "docker.io/${DOCKERHUB_NAMESPACE}/eks-3tier-backend" \
+            --backend-tag "${IMAGE_TAG}"
+
+      - name: Commit updated prod manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No manifest changes detected."
+            exit 0
+          fi
+          git add k8s/overlays/prod/kustomization.yaml
+          git commit -m "chore: promote prod images to ${IMAGE_TAG}"
+          git push origin HEAD:main
+
+      - name: Trigger ArgoCD sync
+        if: ${{ env.ARGOCD_SERVER != '' && env.ARGOCD_AUTH_TOKEN != '' }}
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ARGOCD_AUTH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            "https://${ARGOCD_SERVER}/api/v1/applications/eks-3tier-workloads-prod/sync"

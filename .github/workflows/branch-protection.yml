@@ -1,0 +1,11 @@
+name: Branch Protection
+
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+
+jobs:
+  quality-gates:
+    uses: ./.github/workflows/reusable-quality.yml

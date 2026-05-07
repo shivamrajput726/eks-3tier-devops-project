@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: backend-prod-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: backend-prod-alerts
+      rules:
+        - alert: BackendProdDown
+          expr: up{namespace="three-tier-prod", service="backend"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            environment: prod
+          annotations:
+            summary: Backend service is down in prod
+            description: Prometheus cannot scrape the backend metrics endpoint in the prod namespace.
+        - alert: BackendProdLatencyHigh
+          expr: histogram_quantile(0.95, sum(rate(three_tier_backend_http_request_duration_seconds_bucket{namespace="three-tier-prod"}[5m])) by (le)) > 0.75
+          for: 10m
+          labels:
+            severity: warning
+            environment: prod
+          annotations:
+            summary: High backend latency in prod
+            description: The 95th percentile backend latency is above 750ms for 10 minutes.

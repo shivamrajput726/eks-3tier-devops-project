@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-config
+  namespace: argocd
+spec:
+  project: eks-3tier
+  source:
+    repoURL: https://github.com/shiva/eks-3tier-devops-project.git
+    targetRevision: HEAD
+    path: monitoring/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

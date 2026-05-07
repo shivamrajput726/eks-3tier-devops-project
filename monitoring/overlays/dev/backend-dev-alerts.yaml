@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: backend-dev-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: backend-dev-alerts
+      rules:
+        - alert: BackendDevDown
+          expr: up{namespace="three-tier-dev", service="backend"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            environment: dev
+          annotations:
+            summary: Backend service is down in dev
+            description: Prometheus cannot scrape the backend metrics endpoint in the dev namespace.
+        - alert: BackendDevLatencyHigh
+          expr: histogram_quantile(0.95, sum(rate(three_tier_backend_http_request_duration_seconds_bucket{namespace="three-tier-dev"}[5m])) by (le)) > 1
+          for: 10m
+          labels:
+            severity: warning
+            environment: dev
+          annotations:
+            summary: High backend latency in dev
+            description: The 95th percentile backend latency is above one second for 10 minutes.

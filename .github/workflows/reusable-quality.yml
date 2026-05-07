@@ -1,0 +1,131 @@
+name: Reusable Quality Gates
+
+on:
+  workflow_call:
+
+jobs:
+  backend-quality:
+    name: Backend Lint and Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install backend dependencies
+        run: npm install
+
+      - name: Lint backend
+        run: npm run lint
+
+      - name: Test backend
+        run: npm test
+
+  frontend-quality:
+    name: Frontend Lint and Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Test frontend
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+  manifests-and-terraform:
+    name: Validate Kubernetes and Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.35.0
+
+      - name: Terraform formatting check
+        run: terraform fmt -check -recursive terraform
+
+      - name: Terraform bootstrap validate
+        run: |
+          terraform -chdir=terraform/bootstrap init -backend=false
+          terraform -chdir=terraform/bootstrap validate
+
+      - name: Terraform dev validate
+        run: |
+          terraform -chdir=terraform/environments/dev init -backend=false
+          terraform -chdir=terraform/environments/dev validate
+
+      - name: Terraform prod validate
+        run: |
+          terraform -chdir=terraform/environments/prod init -backend=false
+          terraform -chdir=terraform/environments/prod validate
+
+      - name: Render dev kustomization
+        run: kubectl kustomize k8s/overlays/dev > /tmp/dev-rendered.yaml
+
+      - name: Dry-run dev overlay
+        run: kubectl apply --dry-run=client --validate=false -f /tmp/dev-rendered.yaml
+
+      - name: Render prod kustomization
+        run: kubectl kustomize k8s/overlays/prod > /tmp/prod-rendered.yaml
+
+      - name: Dry-run prod overlay
+        run: kubectl apply --dry-run=client --validate=false -f /tmp/prod-rendered.yaml
+
+      - name: Render monitoring overlays
+        run: |
+          kubectl kustomize monitoring/overlays/dev > /tmp/monitoring-dev.yaml
+          kubectl kustomize monitoring/overlays/prod > /tmp/monitoring-prod.yaml
+
+      - name: Validate docker compose
+        run: docker compose config --quiet
+
+      - name: Build backend Dockerfile
+        run: docker build -t eks-3tier-backend:test ./backend
+
+      - name: Build frontend Dockerfile
+        run: docker build -t eks-3tier-frontend:test ./frontend
+
+  security-scan:
+    name: Trivy Repository Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"

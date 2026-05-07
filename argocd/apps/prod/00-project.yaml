@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: eks-3tier
+  namespace: argocd
+spec:
+  description: Root project for the EKS 3-tier DevOps platform
+  sourceRepos:
+    - https://github.com/shiva/eks-3tier-devops-project.git
+    - https://kubernetes.github.io/ingress-nginx
+    - https://kubernetes-sigs.github.io/metrics-server/
+    - https://prometheus-community.github.io/helm-charts
+  destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    - namespace: ingress-nginx
+      server: https://kubernetes.default.svc
+    - namespace: kube-system
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+    - namespace: three-tier-prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

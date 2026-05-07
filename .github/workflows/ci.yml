@@ -1,0 +1,16 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "k8s/overlays/**"
+      - "README.md"
+      - "troubleshooting.md"
+      - "eksctl_commands.md"
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    uses: ./.github/workflows/reusable-quality.yml
